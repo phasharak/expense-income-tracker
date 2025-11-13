@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบัญชีรายรับรายจ่าย</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1>ระบบัญชีรายรับรายจ่าย</h1>
+
+    <form id="form">
+        <label for="type">ประเภท:</label>
+        <select id="type" required>
+            <option value="รายรับ">รายรับ</option>
+            <option value="รายจ่าย">รายจ่าย</option>
+        </select><br>
+
+        <label for="category">หมวดหมู่:</label>
+        <input type="text" id="category" placeholder="เช่น ค่าอาหาร" required><br>
+
+        <label for="amount">จำนวนเงิน:</label>
+        <input type="number" id="amount" placeholder="จำนวนเงิน" required><br>
+
+        <label for="description">รายละเอียด:</label>
+        <input type="text" id="description" placeholder="เช่น รายได้จากงาน" required><br>
+
+        <button type="submit">เพิ่มรายการ</button>
+    </form>
+
+    <h2>รายการบัญชี</h2>
+    <table id="transactions-table">
+        <thead>
+            <tr>
+                <th>ประเภท</th>
+                <th>หมวดหมู่</th>
+                <th>รายละเอียด</th>
+                <th>จำนวนเงิน</th>
+                <th>วันที่</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- รายการจะเพิ่มที่นี่ -->
+        </tbody>
+    </table>
+
+    <script>
+        /*
+         * ระบบบัญชีรายรับรายจ่ายเวอร์ชันปรับปรุงนี้จะเก็บข้อมูลรายการใน localStorage
+         * เพื่อให้ข้อมูลคงอยู่แม้หลังจากปิดหรือรีเฟรชหน้าเว็บ ทั้งนี้ localStorage
+         * เป็นตัวเก็บข้อมูลฝั่งไคลเอนต์ที่ไม่มีวันหมดอายุ (ต่างจาก sessionStorage)
+         * ตามที่เอกสาร MDN อธิบัยไว้ว่า "stored data is saved across browser sessions"【349012388019771†L185-L193】
+         */
+        const form = document.getElementById("form");
+        const transactionsTableBody = document.getElementById("transactions-table").getElementsByTagName('tbody')[0];
+
+        // โหลดรายการจาก localStorage หากมี
+        let transactions = [];
+        const saved = localStorage.getItem('transactions');
+        if (saved) {
+            try {
+                transactions = JSON.parse(saved);
+            } catch (e) {
+                console.error('ไม่สามารแปลงข้อมูลที่เก็บไว้ได้:', e);
+                transactions = [];
+            }
+        }
+
+        // ฟังก์ชันสำหรับบันทึกลง localStorage
+        function saveTransactions() {
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+        }
+
+        // แสดงรายการทั้งหมดในตาราง
+        function renderTransactions() {
+            // เคลี่ยรายการเก่าก่อนแสดงใหม่
+            transactionsTableBody.innerHTML = '';
+            transactions.forEach(item => {
+                const row = transactionsTableBody.insertRow();
+                row.insertCell(0).innerText = item.type;
+                row.insertCell(1).innerText = item.category;
+                row.insertCell(2).innerText = item.description;
+                row.insertCell(3).innerText = item.amount;
+                row.insertCell(4).innerText = item.date;
+            });
+        }
+
+        // เรียกฟังก์ชันเพื่อแสดงข้อมูลเมื่อโหลดหน้าเว็บ
+        renderTransactions();
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const type = document.getElementById("type").value;
+            const category = document.getElementById("category").value;
+            const amount = document.getElementById("amount").value;
+            const description = document.getElementById("description").value;
+            const date = new Date().toLocaleDateString();
+
+            // เพิ่มลงในรายการ
+            const transaction = { type, category, description, amount, date };
+            transactions.push(transaction);
+            saveTransactions();
+
+            // เพิ่มแถวใหม่ในตาราง
+            const newRow = transactionsTableBody.insertRow();
+            newRow.insertCell(0).innerText = type;
+            newRow.insertCell(1).innerText = category;
+            newRow.insertCell(2).innerText = description;
+            newRow.insertCell(3).innerText = amount;
+            newRow.insertCell(4).innerText = date;
+
+            // รีเซ็ตฟอร์ม
+            form.reset();
+        });
+    </script>
+</body>
+</html>
