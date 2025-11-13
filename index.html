@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบบังชีรายรับรายจ่าย</title>
+    <title>ระบบบัญชีรายรับรายจ่าย</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -30,7 +30,7 @@
     </style>
 </head>
 <body>
-    <h1>ระบบบังชีรายรับรายจ่าย</h1>
+    <h1>ระบบบัญชีรายรับรายจ่าย</h1>
 
     <form id="form">
         <label for="type">ประเภท:</label>
@@ -40,14 +40,16 @@
         </select><br>
 
         <label for="category">หมวดหมู่:</label>
+        <!-- เปลี่ยนจากการรับข้อความอิสระเป็นการแนะนำหมวดหมู่ผ่าน datalist เพื่อความสะดวกในการเลือก
+             โดยยังเปิดโอกาสให้กรอกหมวดหมู่ใหม่ได้เอง -->
         <input list="categories" id="category" placeholder="เช่น ค่าอาหาร" required>
-<datalist id="categories">
-    <option value="ค่าอาหาร">
-    <option value="ค่าเดินทาง">
-    <option value="ค่าจดจำนอง">
-    <option value="ค่าโอนที่ดิน">
-    <option value="อื่นๆ">
-</datalist><br>
+        <datalist id="categories">
+            <option value="ค่าอาหาร">
+            <option value="ค่าเดินทาง">
+            <option value="ค่าจดจำนอง">
+            <option value="ค่าโอนที่ดิน">
+            <option value="อื่นๆ">
+        </datalist><br>
 
         <label for="amount">จำนวนเงิน:</label>
         <input type="number" id="amount" placeholder="จำนวนเงิน" required><br>
@@ -70,28 +72,115 @@
             </tr>
         </thead>
         <tbody>
-            <!-- รายการจะเพิ่มที่นี้ -->
+            <!-- รายการจะเพิ่มที่นี่ -->
         </tbody>
     </table>
 
-    <!-- ปุ่มสำหรับการจัดการข้อมูล -->
+    <!-- ปุ่มสำหรับการจัดการข้อมูลเพิ่มเติม -->
     <div style="margin-top: 20px;">
         <button id="exportButton" type="button">ดาวน์โหลดข้อมูล</button>
         <button id="importButton" type="button">นำเข้าข้อมูล</button>
         <button id="clearButton" type="button">ล้างข้อมูลทั้งหมด</button>
-        <!-- อินพุตไฟล์ถี่ถู่ซ่อนไว้ ใช้สำหรับนำเข้าข้อมูล -->
+        <!-- อินพุตไฟล์ถูกซ่อนไว้ ใช้สำหรับนำเข้าข้อมูล -->
         <input type="file" id="fileInput" accept="application/json" style="display: none;">
     </div>
 
+    <!-- สรุปยอดและกราฟ -->
+    <div id="summary" style="margin-top: 20px;">
+        <h3>สรุปผลรวม</h3>
+        <p id="total-income">รายรับรวม: 0</p>
+        <p id="total-expense">รายจ่ายรวม: 0</p>
+        <p id="balance">คงเหลือ: 0</p>
+    </div>
+    <div style="margin-top: 20px;">
+        <canvas id="chart" width="400" height="200"></canvas>
+    </div>
+
+    <!-- โหลดไลบรารี Chart.js สำหรับสร้างกราฟ -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script>
         /*
-         * ระบบบังชีรายรับรายจ่ายเวอร์ชันปรับปรุงนี้จะเก็บข้อมูลรายการใน localStorage
+         * ระบบบัญชีรายรับรายจ่ายเวอร์ชันปรับปรุงนี้จะเก็บข้อมูลรายการใน localStorage
          * เพื่อให้ข้อมูลคงอยู่แม้หลังจากปิดหรือรีเฟรชหน้าเว็บ ทั้งนี้ localStorage
-         * เป็นตัวเก็บข้อมูลฝั่งไคลเอนต์ที่ไม่มีวันหมดอายุ ( ต่างจาก sessionStorage )
+         * เป็นตัวเก็บข้อมูลฝั่งไคลเอนต์ที่ไม่มีวันหมดอายุ (ต่างจาก sessionStorage)
          * ตามที่เอกสาร MDN อธิบายไว้ว่า "stored data is saved across browser sessions"【349012388019771†L185-L193】
          */
         const form = document.getElementById("form");
         const transactionsTableBody = document.getElementById("transactions-table").getElementsByTagName('tbody')[0];
+
+        // Chart.js variables
+        let expenseChart;
+        // รายการหมวดหมู่ที่รองรับในกราฟ
+        const categoriesList = ["ค่าอาหาร", "ค่าเดินทาง", "ค่าจดจำนอง", "ค่าโอนที่ดิน", "อื่นๆ"];
+
+        // ฟังก์ชันอัปเดตสรุปยอดรายรับ รายจ่าย และคงเหลือ
+        function updateSummary() {
+            let totalIncome = 0;
+            let totalExpense = 0;
+            transactions.forEach(item => {
+                const amt = parseFloat(item.amount) || 0;
+                if (item.type === 'รายรับ') {
+                    totalIncome += amt;
+                } else {
+                    totalExpense += amt;
+                }
+            });
+            document.getElementById('total-income').innerText = 'รายรับรวม: ' + totalIncome;
+            document.getElementById('total-expense').innerText = 'รายจ่ายรวม: ' + totalExpense;
+            document.getElementById('balance').innerText = 'คงเหลือ: ' + (totalIncome - totalExpense);
+        }
+
+        // ฟังก์ชันอัปเดตกำรสร้างกราฟแสดงผลรวมตามหมวดหมู่
+        function updateChart() {
+            // เตรียมข้อมูลสำหรับแต่ละหมวดหมู่
+            const incomeData = categoriesList.map(() => 0);
+            const expenseData = categoriesList.map(() => 0);
+            transactions.forEach(item => {
+                const idx = categoriesList.indexOf(item.category);
+                if (idx !== -1) {
+                    const amt = parseFloat(item.amount) || 0;
+                    if (item.type === 'รายรับ') {
+                        incomeData[idx] += amt;
+                    } else {
+                        expenseData[idx] += amt;
+                    }
+                }
+            });
+            const ctx = document.getElementById('chart').getContext('2d');
+            if (expenseChart) {
+                expenseChart.data.datasets[0].data = incomeData;
+                expenseChart.data.datasets[1].data = expenseData;
+                expenseChart.update();
+            } else {
+                expenseChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: categoriesList,
+                        datasets: [
+                            {
+                                label: 'รายรับ',
+                                data: incomeData,
+                                borderWidth: 1
+                            },
+                            {
+                                label: 'รายจ่าย',
+                                data: expenseData,
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+        }
 
         // โหลดรายการจาก localStorage หากมี
         let transactions = [];
@@ -100,12 +189,12 @@
             try {
                 transactions = JSON.parse(saved);
             } catch (e) {
-                console.error('ไม่สามารถ์แปลงข้อมูลที่เก็บไว้:', e);
+                console.error('ไม่สามารถแปลงข้อมูลที่เก็บไว้ได้:', e);
                 transactions = [];
             }
         }
 
-        // ฟังก์ชันสำหรับบันทึก localStorage
+        // ฟังก์ชันสำหรับบันทึกลง localStorage
         function saveTransactions() {
             localStorage.setItem('transactions', JSON.stringify(transactions));
         }
@@ -122,6 +211,9 @@
                 row.insertCell(3).innerText = item.amount;
                 row.insertCell(4).innerText = item.date;
             });
+            // อัปเดตสรุปยอดและกราฟหลังจากแสดงข้อมูลในตาราง
+            updateSummary();
+            updateChart();
         }
 
         // เรียกฟังก์ชันเพื่อแสดงข้อมูลเมื่อโหลดหน้าเว็บ
@@ -141,7 +233,7 @@
             transactions.push(transaction);
             saveTransactions();
 
-            // เพิ่มแทวใหม่ในตาราง
+            // เพิ่มแถวใหม่ในตาราง
             const newRow = transactionsTableBody.insertRow();
             newRow.insertCell(0).innerText = type;
             newRow.insertCell(1).innerText = category;
@@ -151,6 +243,10 @@
 
             // รีเซ็ตฟอร์ม
             form.reset();
+
+            // อัปเดตสรุปยอดและกราฟหลังจากเพิ่มรายการใหม่
+            updateSummary();
+            updateChart();
         });
 
         // ฟังก์ชันดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ JSON
@@ -185,20 +281,20 @@
                         saveTransactions();
                         renderTransactions();
                     } else {
-                        alert('รูปแบบข้อมูลไม่ถู่ก้อง');
+                        alert('รูปแบบข้อมูลไม่ถูกต้อง');
                     }
                 } catch (err) {
-                    alert('ไม่สามารถ์อ่านไฟล์ JSON ได้');
+                    alert('ไม่สามารถอ่านไฟล์ JSON ได้');
                 }
             };
             reader.readAsText(file);
-            // รีเซ็ตค่าไฟล์อินพุตเพื่อให้สามารถ์นำเข้าไฟล์เดิมซ้ำได้
+            // รีเซ็ตค่าไฟล์อินพุตเพื่อให้สามารถนำเข้าไฟล์เดิมซ้ำได้
             e.target.value = '';
         });
 
         // ฟังก์ชันลบข้อมูลทั้งหมด
         document.getElementById('clearButton').addEventListener('click', function() {
-            if (confirm('คุณต้องการลบข้อมูลทั้งหมดหรือไม?')) {
+            if (confirm('คุณต้องการลบข้อมูลทั้งหมดหรือไม่?')) {
                 transactions = [];
                 saveTransactions();
                 renderTransactions();
