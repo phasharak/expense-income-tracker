@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบัญชีรายรับรายจ่าย</title>
+    <title>ระบบบังชีรายรับรายจ่าย</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -30,7 +30,7 @@
     </style>
 </head>
 <body>
-    <h1>ระบบัญชีรายรับรายจ่าย</h1>
+    <h1>ระบบบังชีรายรับรายจ่าย</h1>
 
     <form id="form">
         <label for="type">ประเภท:</label>
@@ -63,16 +63,25 @@
             </tr>
         </thead>
         <tbody>
-            <!-- รายการจะเพิ่มที่นี่ -->
+            <!-- รายการจะเพิ่มที่นี้ -->
         </tbody>
     </table>
 
+    <!-- ปุ่มสำหรับการจัดการข้อมูล -->
+    <div style="margin-top: 20px;">
+        <button id="exportButton" type="button">ดาวน์โหลดข้อมูล</button>
+        <button id="importButton" type="button">นำเข้าข้อมูล</button>
+        <button id="clearButton" type="button">ล้างข้อมูลทั้งหมด</button>
+        <!-- อินพุตไฟล์ถี่ถู่ซ่อนไว้ ใช้สำหรับนำเข้าข้อมูล -->
+        <input type="file" id="fileInput" accept="application/json" style="display: none;">
+    </div>
+
     <script>
         /*
-         * ระบบบัญชีรายรับรายจ่ายเวอร์ชันปรับปรุงนี้จะเก็บข้อมูลรายการใน localStorage
+         * ระบบบังชีรายรับรายจ่ายเวอร์ชันปรับปรุงนี้จะเก็บข้อมูลรายการใน localStorage
          * เพื่อให้ข้อมูลคงอยู่แม้หลังจากปิดหรือรีเฟรชหน้าเว็บ ทั้งนี้ localStorage
-         * เป็นตัวเก็บข้อมูลฝั่งไคลเอนต์ที่ไม่มีวันหมดอายุ (ต่างจาก sessionStorage)
-         * ตามที่เอกสาร MDN อธิบัยไว้ว่า "stored data is saved across browser sessions"【349012388019771†L185-L193】
+         * เป็นตัวเก็บข้อมูลฝั่งไคลเอนต์ที่ไม่มีวันหมดอายุ ( ต่างจาก sessionStorage )
+         * ตามที่เอกสาร MDN อธิบายไว้ว่า "stored data is saved across browser sessions"【349012388019771†L185-L193】
          */
         const form = document.getElementById("form");
         const transactionsTableBody = document.getElementById("transactions-table").getElementsByTagName('tbody')[0];
@@ -84,19 +93,19 @@
             try {
                 transactions = JSON.parse(saved);
             } catch (e) {
-                console.error('ไม่สามารแปลงข้อมูลที่เก็บไว้ได้:', e);
+                console.error('ไม่สามารถ์แปลงข้อมูลที่เก็บไว้:', e);
                 transactions = [];
             }
         }
 
-        // ฟังก์ชันสำหรับบันทึกลง localStorage
+        // ฟังก์ชันสำหรับบันทึก localStorage
         function saveTransactions() {
             localStorage.setItem('transactions', JSON.stringify(transactions));
         }
 
         // แสดงรายการทั้งหมดในตาราง
         function renderTransactions() {
-            // เคลี่ยรายการเก่าก่อนแสดงใหม่
+            // เคลียร์ข้อมูลเก่าก่อนแสดงใหม่
             transactionsTableBody.innerHTML = '';
             transactions.forEach(item => {
                 const row = transactionsTableBody.insertRow();
@@ -125,7 +134,7 @@
             transactions.push(transaction);
             saveTransactions();
 
-            // เพิ่มแถวใหม่ในตาราง
+            // เพิ่มแทวใหม่ในตาราง
             const newRow = transactionsTableBody.insertRow();
             newRow.insertCell(0).innerText = type;
             newRow.insertCell(1).innerText = category;
@@ -135,6 +144,58 @@
 
             // รีเซ็ตฟอร์ม
             form.reset();
+        });
+
+        // ฟังก์ชันดาวน์โหลดข้อมูลทั้งหมดเป็นไฟล์ JSON
+        document.getElementById('exportButton').addEventListener('click', function() {
+            const dataStr = JSON.stringify(transactions);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'transactions.json';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+
+        // เมื่อคลิกปุ่มนำเข้าจะเรียกเลือกไฟล์
+        document.getElementById('importButton').addEventListener('click', function() {
+            document.getElementById('fileInput').click();
+        });
+
+        // อ่านไฟล์ JSON และอัพเดตข้อมูล
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (Array.isArray(imported)) {
+                        transactions = imported;
+                        saveTransactions();
+                        renderTransactions();
+                    } else {
+                        alert('รูปแบบข้อมูลไม่ถู่ก้อง');
+                    }
+                } catch (err) {
+                    alert('ไม่สามารถ์อ่านไฟล์ JSON ได้');
+                }
+            };
+            reader.readAsText(file);
+            // รีเซ็ตค่าไฟล์อินพุตเพื่อให้สามารถ์นำเข้าไฟล์เดิมซ้ำได้
+            e.target.value = '';
+        });
+
+        // ฟังก์ชันลบข้อมูลทั้งหมด
+        document.getElementById('clearButton').addEventListener('click', function() {
+            if (confirm('คุณต้องการลบข้อมูลทั้งหมดหรือไม?')) {
+                transactions = [];
+                saveTransactions();
+                renderTransactions();
+            }
         });
     </script>
 </body>
